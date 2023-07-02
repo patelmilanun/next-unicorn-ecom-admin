@@ -16,7 +16,13 @@ interface ModalProps {
   children?: React.ReactNode;
 }
 
-function Modal({ title, description, isOpen, onClose, children }: ModalProps) {
+const Modal = ({
+  title,
+  description,
+  isOpen,
+  onClose,
+  children,
+}: ModalProps) => {
   const onChange = (open: boolean) => {
     if (!open) {
       onClose();
@@ -34,6 +40,6 @@ function Modal({ title, description, isOpen, onClose, children }: ModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+};
 
 export { Modal };

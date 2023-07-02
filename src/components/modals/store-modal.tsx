@@ -24,7 +24,7 @@ const formSchema = z.object({
   name: z.string().min(3, 'Too short for a store name. Think creative'),
 });
 
-export const StoreModal = () => {
+export default function StoreModal() {
   const storeModal = useStoreModal();
 
   const [loading, setLoading] = useState(false);
@@ -97,4 +97,4 @@ export const StoreModal = () => {
       </div>
     </Modal>
   );
-};
+}
