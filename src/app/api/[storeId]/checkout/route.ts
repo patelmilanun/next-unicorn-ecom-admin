@@ -18,10 +18,16 @@ export async function POST(
   req: Request,
   { params }: { params: { storeId: string } }
 ) {
-  const { productIds } = await req.json();
+  const { productIds, redirectUrl, cancelUrl } = await req.json();
 
   if (!productIds || productIds.length === 0) {
     return new NextResponse('Product ids are required', { status: 400 });
+  }
+
+  if (!redirectUrl || !cancelUrl) {
+    return new NextResponse('Redirect Url and Cancel Url are required', {
+      status: 400,
+    });
   }
 
   const products = await prismadb.product.findMany({
@@ -70,8 +76,8 @@ export async function POST(
     phone_number_collection: {
       enabled: true,
     },
-    success_url: `${process.env.FRONTEND_STORE_URL}/cart?success=1`,
-    cancel_url: `${process.env.FRONTEND_STORE_URL}/cart?canceled=1`,
+    success_url: redirectUrl,
+    cancel_url: cancelUrl,
     metadata: {
       orderId: order.id,
     },
