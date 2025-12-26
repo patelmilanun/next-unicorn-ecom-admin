@@ -79,6 +79,7 @@ export default function StoreSwitcher({
               {formattedItems.map((store) => (
                 <CommandItem
                   key={store.value}
+                  value={store.label}
                   onSelect={() => onStoreSelect(store)}
                   className="text-sm"
                 >
@@ -96,21 +97,19 @@ export default function StoreSwitcher({
               ))}
             </CommandGroup>
           </CommandList>
-          <CommandSeparator />
-          <CommandList>
-            <CommandGroup>
-              <CommandItem
-                onSelect={() => {
-                  setOpen(false);
-                  storeModal.onOpen();
-                }}
-              >
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Create Store
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
         </Command>
+        <div className="border-t px-1 py-1.5">
+          <button
+            onClick={() => {
+              setOpen(false);
+              storeModal.onOpen();
+            }}
+            className="w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <PlusCircle className="h-5 w-5" />
+            Create Store
+          </button>
+        </div>
       </PopoverContent>
     </Popover>
   );
