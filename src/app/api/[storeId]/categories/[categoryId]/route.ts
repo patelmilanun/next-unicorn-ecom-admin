@@ -1,22 +1,24 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
+import { and, eq } from 'drizzle-orm';
 
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { categories, stores } from '@/db/schema';
 
 export async function GET(
   req: Request,
-  { params }: { params: { categoryId: string } }
+  { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
-    if (!params.categoryId) {
+    const { categoryId } = await params;
+
+    if (!categoryId) {
       return new NextResponse('Category id is required', { status: 400 });
     }
 
-    const category = await prismadb.category.findUnique({
-      where: {
-        id: params.categoryId,
-      },
-      include: {
+    const category = await db.query.categories.findFirst({
+      where: eq(categories.id, categoryId),
+      with: {
         billboard: true,
       },
     });
@@ -30,35 +32,33 @@ export async function GET(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { categoryId: string; storeId: string } }
+  { params }: { params: Promise<{ categoryId: string; storeId: string }> }
 ) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return new NextResponse('Unauthenticated', { status: 403 });
     }
 
-    if (!params.categoryId) {
+    const { categoryId, storeId } = await params;
+
+    if (!categoryId) {
       return new NextResponse('Category id is required', { status: 400 });
     }
 
-    const storeByUserId = await prismadb.store.findFirst({
-      where: {
-        id: params.storeId,
-        userId,
-      },
+    const storeByUserId = await db.query.stores.findFirst({
+      where: and(eq(stores.id, storeId), eq(stores.userId, userId)),
     });
 
     if (!storeByUserId) {
       return new NextResponse('Unauthorized', { status: 405 });
     }
 
-    const category = await prismadb.category.delete({
-      where: {
-        id: params.categoryId,
-      },
-    });
+    const [category] = await db
+      .delete(categories)
+      .where(eq(categories.id, categoryId))
+      .returning();
 
     return NextResponse.json(category);
   } catch (error) {
@@ -69,10 +69,10 @@ export async function DELETE(
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { categoryId: string; storeId: string } }
+  { params }: { params: Promise<{ categoryId: string; storeId: string }> }
 ) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
 
     const body = await req.json();
 
@@ -90,30 +90,28 @@ export async function PATCH(
       return new NextResponse('Name is required', { status: 400 });
     }
 
-    if (!params.categoryId) {
+    const { categoryId, storeId } = await params;
+
+    if (!categoryId) {
       return new NextResponse('Category id is required', { status: 400 });
     }
 
-    const storeByUserId = await prismadb.store.findFirst({
-      where: {
-        id: params.storeId,
-        userId,
-      },
+    const storeByUserId = await db.query.stores.findFirst({
+      where: and(eq(stores.id, storeId), eq(stores.userId, userId)),
     });
 
     if (!storeByUserId) {
       return new NextResponse('Unauthorized', { status: 405 });
     }
 
-    const category = await prismadb.category.update({
-      where: {
-        id: params.categoryId,
-      },
-      data: {
+    const [category] = await db
+      .update(categories)
+      .set({
         name,
         billboardId,
-      },
-    });
+      })
+      .where(eq(categories.id, categoryId))
+      .returning();
 
     return NextResponse.json(category);
   } catch (error) {

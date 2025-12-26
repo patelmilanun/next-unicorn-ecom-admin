@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Trash } from 'lucide-react';
-import { Billboard, Category } from '@prisma/client';
+import { Billboard, Category } from '@/db/schema';
 import { useParams, useRouter } from 'next/navigation';
 
 import { Input } from '@/components/ui/input';
@@ -60,10 +60,15 @@ export default function CategoryForm({
 
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
-      name: '',
-      billboardId: '',
-    },
+    defaultValues: initialData
+      ? {
+          name: initialData.name,
+          billboardId: initialData.billboardId,
+        }
+      : {
+          name: '',
+          billboardId: '',
+        },
   });
 
   const onSubmit = async (data: CategoryFormValues) => {

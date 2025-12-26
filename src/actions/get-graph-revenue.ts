@@ -1,4 +1,6 @@
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { orders, orderItems, products } from '@/db/schema';
+import { eq, and, sum, sql } from 'drizzle-orm';
 
 interface GraphData {
   name: string;
@@ -8,36 +10,24 @@ interface GraphData {
 export const getGraphRevenue = async (
   storeId: string
 ): Promise<GraphData[]> => {
-  const paidOrders = await prismadb.order.findMany({
-    where: {
-      storeId,
-      isPaid: true,
-    },
-    include: {
-      orderItems: {
-        include: {
-          product: true,
-        },
-      },
-    },
-  });
+  const result = await db
+    .select({
+      month: sql<string>`strftime('%m', datetime(${orders.createdAt}, 'unixepoch'))`,
+      revenue: sum(products.price),
+    })
+    .from(orders)
+    .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+    .innerJoin(products, eq(orderItems.productId, products.id))
+    .where(and(eq(orders.storeId, storeId), eq(orders.isPaid, true)))
+    .groupBy(sql`strftime('%m', datetime(${orders.createdAt}, 'unixepoch'))`);
 
   const monthlyRevenue: { [key: number]: number } = {};
+  
+  result.forEach((row) => {
+    const monthIndex = parseInt(row.month) - 1; // strftime returns '01'-'12'
+    monthlyRevenue[monthIndex] = Number(row.revenue) || 0;
+  });
 
-  // Grouping the orders by month and summing the revenue
-  for (const order of paidOrders) {
-    const month = order.createdAt.getMonth(); // 0 for Jan, 1 for Feb, ...
-    let revenueForOrder = 0;
-
-    for (const item of order.orderItems) {
-      revenueForOrder += item.product.price.toNumber();
-    }
-
-    // Adding the revenue for this order to the respective month
-    monthlyRevenue[month] = (monthlyRevenue[month] || 0) + revenueForOrder;
-  }
-
-  // Converting the grouped data into the format expected by the graph
   const graphData: GraphData[] = [
     { name: 'Jan', total: 0 },
     { name: 'Feb', total: 0 },
@@ -53,9 +43,8 @@ export const getGraphRevenue = async (
     { name: 'Dec', total: 0 },
   ];
 
-  // Filling in the revenue data
-  for (const month in monthlyRevenue) {
-    graphData[parseInt(month)].total = monthlyRevenue[parseInt(month)];
+  for (let i = 0; i < 12; i++) {
+    graphData[i].total = monthlyRevenue[i] || 0;
   }
 
   return graphData;

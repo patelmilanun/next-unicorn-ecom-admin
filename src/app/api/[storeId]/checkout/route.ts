@@ -2,7 +2,9 @@ import Stripe from 'stripe';
 import { NextResponse } from 'next/server';
 
 import { stripe } from '@/lib/stripe';
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { products as productsTable, orders, orderItems } from '@/db/schema';
+import { inArray, eq } from 'drizzle-orm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +18,7 @@ export async function OPTIONS() {
 
 export async function POST(
   req: Request,
-  { params }: { params: { storeId: string } }
+  { params }: { params: Promise<{ storeId: string }> }
 ) {
   const { productIds, redirectUrl, cancelUrl } = await req.json();
 
@@ -30,13 +32,12 @@ export async function POST(
     });
   }
 
-  const products = await prismadb.product.findMany({
-    where: {
-      id: {
-        in: productIds,
-      },
-    },
-  });
+  const { storeId } = await params;
+
+  const products = await db
+    .select()
+    .from(productsTable)
+    .where(inArray(productsTable.id, productIds));
 
   const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
 
@@ -48,25 +49,31 @@ export async function POST(
         product_data: {
           name: product.name,
         },
-        unit_amount: product.price.toNumber() * 100,
+        unit_amount: (product.price || 0) * 100,
       },
     });
   });
 
-  const order = await prismadb.order.create({
-    data: {
-      storeId: params.storeId,
-      isPaid: false,
-      orderItems: {
-        create: productIds.map((productId: string) => ({
-          product: {
-            connect: {
-              id: productId,
-            },
-          },
-        })),
-      },
-    },
+  const order = await db.transaction(async (tx) => {
+    const orderId = crypto.randomUUID();
+    const [newOrder] = await tx
+      .insert(orders)
+      .values({
+        id: orderId,
+        storeId: storeId,
+        isPaid: false,
+      })
+      .returning();
+
+    await tx.insert(orderItems).values(
+      productIds.map((productId: string) => ({
+        id: crypto.randomUUID(),
+        orderId,
+        productId,
+      }))
+    );
+
+    return newOrder;
   });
 
   const session = await stripe.checkout.sessions.create({

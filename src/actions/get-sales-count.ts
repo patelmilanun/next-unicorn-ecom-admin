@@ -1,12 +1,12 @@
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { orders } from '@/db/schema';
+import { eq, and, count } from 'drizzle-orm';
 
 export const getSalesCount = async (storeId: string) => {
-  const salesCount = await prismadb.order.count({
-    where: {
-      storeId,
-      isPaid: true,
-    },
-  });
+  const result = await db
+    .select({ value: count() })
+    .from(orders)
+    .where(and(eq(orders.storeId, storeId), eq(orders.isPaid, true)));
 
-  return salesCount;
+  return result[0].value;
 };

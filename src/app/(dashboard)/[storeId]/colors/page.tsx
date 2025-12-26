@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
+import { desc, eq } from 'drizzle-orm';
 
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { colors } from '@/db/schema';
 
 import { ColorColumn } from './components/columns';
 import ColorClient from './components/client';
@@ -8,22 +10,19 @@ import ColorClient from './components/client';
 export default async function ColorsPage({
   params,
 }: {
-  params: { storeId: string };
+  params: Promise<{ storeId: string }>;
 }) {
-  const colors = await prismadb.color.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
+  const { storeId } = await params;
+  const results = await db.query.colors.findMany({
+    where: eq(colors.storeId, storeId),
+    orderBy: desc(colors.createdAt),
   });
 
-  const formattedColors: ColorColumn[] = colors.map((item) => ({
+  const formattedColors: ColorColumn[] = results.map((item) => ({
     id: item.id,
     name: item.name,
     value: item.value,
-    createdAt: format(item.createdAt, 'MMMM do, yyyy'),
+    createdAt: format(item.createdAt!, 'MMMM do, yyyy'),
   }));
 
   return (

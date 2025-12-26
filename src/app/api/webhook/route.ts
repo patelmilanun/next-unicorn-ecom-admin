@@ -3,11 +3,13 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 import { stripe } from '@/lib/stripe';
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { orders, products, orderItems } from '@/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 
 export async function POST(req: Request) {
   const body = await req.text();
-  const signature = headers().get('Stripe-Signature') as string;
+  const signature = (await headers()).get('Stripe-Signature') as string;
 
   let event: Stripe.Event;
 
@@ -36,32 +38,37 @@ export async function POST(req: Request) {
   const addressString = addressComponents.filter((c) => c !== null).join(', ');
 
   if (event.type === 'checkout.session.completed') {
-    const order = await prismadb.order.update({
-      where: {
-        id: session?.metadata?.orderId,
-      },
-      data: {
+    const orderId = session?.metadata?.orderId;
+
+    if (!orderId) {
+      return new NextResponse('Order ID not found in metadata', {
+        status: 400,
+      });
+    }
+
+    const [order] = await db
+      .update(orders)
+      .set({
         isPaid: true,
         address: addressString,
         phone: session?.customer_details?.phone || '',
-      },
-      include: {
-        orderItems: true,
-      },
-    });
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
 
-    const productIds = order.orderItems.map((orderItem) => orderItem.productId);
+    const items = await db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId));
 
-    await prismadb.product.updateMany({
-      where: {
-        id: {
-          in: [...productIds],
-        },
-      },
-      data: {
-        isArchived: true,
-      },
-    });
+    const productIds = items.map((orderItem) => orderItem.productId);
+
+    if (productIds.length > 0) {
+      await db
+        .update(products)
+        .set({ isArchived: true })
+        .where(inArray(products.id, productIds));
+    }
   }
 
   return new NextResponse(null, { status: 200 });

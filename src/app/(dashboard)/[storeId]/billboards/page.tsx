@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
+import { desc, eq } from 'drizzle-orm';
 
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { billboards } from '@/db/schema';
 
 import { BillboardColumn } from './components/columns';
 import BillboardClient from './components/client';
@@ -8,21 +10,18 @@ import BillboardClient from './components/client';
 export default async function BillboardsPage({
   params,
 }: {
-  params: { storeId: string };
+  params: Promise<{ storeId: string }>;
 }) {
-  const billboards = await prismadb.billboard.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
+  const { storeId } = await params;
+  const results = await db.query.billboards.findMany({
+    where: eq(billboards.storeId, storeId),
+    orderBy: desc(billboards.createdAt),
   });
 
-  const formattedBillboards: BillboardColumn[] = billboards.map((item) => ({
+  const formattedBillboards: BillboardColumn[] = results.map((item) => ({
     id: item.id,
     label: item.label,
-    createdAt: format(item.createdAt, 'MMMM do, yyyy'),
+    createdAt: format(item.createdAt!, 'MMMM do, yyyy'),
   }));
 
   return (

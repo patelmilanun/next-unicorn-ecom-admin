@@ -11,16 +11,17 @@ import { getStockCount } from '@/actions/get-stock-count';
 import { formatter } from '@/lib/utils';
 
 interface DashboardPageProps {
-  params: {
+  params: Promise<{
     storeId: string;
-  };
+  }>;
 }
 
 export default async function DashboardPage({ params }: DashboardPageProps) {
-  const totalRevenue = await getTotalRevenue(params.storeId);
-  const graphRevenue = await getGraphRevenue(params.storeId);
-  const salesCount = await getSalesCount(params.storeId);
-  const stockCount = await getStockCount(params.storeId);
+  const { storeId } = await params;
+  const totalRevenue = await getTotalRevenue(storeId);
+  const graphRevenue = await getGraphRevenue(storeId);
+  const salesCount = await getSalesCount(storeId);
+  const stockCount = await getStockCount(storeId);
 
   return (
     <div className="flex-col">

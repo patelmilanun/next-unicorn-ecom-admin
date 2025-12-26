@@ -1,26 +1,27 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
+import { and, eq } from 'drizzle-orm';
 
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { stores } from '@/db/schema';
 
 import SettingsForm from './components/settings-form';
 
 export default async function SettingsPage({
   params,
 }: {
-  params: { storeId: string };
+  params: Promise<{ storeId: string }>;
 }) {
-  const { userId } = auth();
+  const { userId } = await auth();
 
   if (!userId) {
     redirect('/sign-in');
   }
 
-  const store = await prismadb.store.findFirst({
-    where: {
-      id: params.storeId,
-      userId,
-    },
+  const { storeId } = await params;
+
+  const store = await db.query.stores.findFirst({
+    where: and(eq(stores.id, storeId), eq(stores.userId, userId)),
   });
 
   if (!store) {

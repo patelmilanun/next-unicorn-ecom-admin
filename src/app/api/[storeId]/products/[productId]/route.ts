@@ -1,22 +1,24 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
+import { and, eq } from 'drizzle-orm';
 
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { products, images, stores } from '@/db/schema';
 
 export async function GET(
   req: Request,
-  { params }: { params: { productId: string } }
+  { params }: { params: Promise<{ productId: string }> }
 ) {
   try {
-    if (!params.productId) {
+    const { productId } = await params;
+
+    if (!productId) {
       return new NextResponse('Product id is required', { status: 400 });
     }
 
-    const product = await prismadb.product.findUnique({
-      where: {
-        id: params.productId,
-      },
-      include: {
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+      with: {
         images: true,
         category: true,
         size: true,
@@ -33,35 +35,33 @@ export async function GET(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { productId: string; storeId: string } }
+  { params }: { params: Promise<{ productId: string; storeId: string }> }
 ) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return new NextResponse('Unauthenticated', { status: 403 });
     }
 
-    if (!params.productId) {
+    const { productId, storeId } = await params;
+
+    if (!productId) {
       return new NextResponse('Product id is required', { status: 400 });
     }
 
-    const storeByUserId = await prismadb.store.findFirst({
-      where: {
-        id: params.storeId,
-        userId,
-      },
+    const storeByUserId = await db.query.stores.findFirst({
+      where: and(eq(stores.id, storeId), eq(stores.userId, userId)),
     });
 
     if (!storeByUserId) {
       return new NextResponse('Unauthorized', { status: 405 });
     }
 
-    const product = await prismadb.product.delete({
-      where: {
-        id: params.productId,
-      },
-    });
+    const [product] = await db
+      .delete(products)
+      .where(eq(products.id, productId))
+      .returning();
 
     return NextResponse.json(product);
   } catch (error) {
@@ -72,10 +72,10 @@ export async function DELETE(
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { productId: string; storeId: string } }
+  { params }: { params: Promise<{ productId: string; storeId: string }> }
 ) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
 
     const body = await req.json();
 
@@ -83,7 +83,7 @@ export async function PATCH(
       name,
       price,
       categoryId,
-      images,
+      images: productImages,
       colorId,
       sizeId,
       isFeatured,
@@ -94,7 +94,9 @@ export async function PATCH(
       return new NextResponse('Unauthenticated', { status: 403 });
     }
 
-    if (!params.productId) {
+    const { productId, storeId } = await params;
+
+    if (!productId) {
       return new NextResponse('Product id is required', { status: 400 });
     }
 
@@ -102,7 +104,7 @@ export async function PATCH(
       return new NextResponse('Name is required', { status: 400 });
     }
 
-    if (!images || !images.length) {
+    if (!productImages || !productImages.length) {
       return new NextResponse('Images are required', { status: 400 });
     }
 
@@ -122,46 +124,44 @@ export async function PATCH(
       return new NextResponse('Size id is required', { status: 400 });
     }
 
-    const storeByUserId = await prismadb.store.findFirst({
-      where: {
-        id: params.storeId,
-        userId,
-      },
+    const storeByUserId = await db.query.stores.findFirst({
+      where: and(eq(stores.id, storeId), eq(stores.userId, userId)),
     });
 
     if (!storeByUserId) {
       return new NextResponse('Unauthorized', { status: 405 });
     }
 
-    await prismadb.product.update({
-      where: {
-        id: params.productId,
-      },
-      data: {
-        name,
-        price,
-        categoryId,
-        colorId,
-        sizeId,
-        images: {
-          deleteMany: {},
-        },
-        isFeatured,
-        isArchived,
-      },
-    });
+    const product = await db.transaction(async (tx) => {
+      await tx
+        .update(products)
+        .set({
+          name,
+          price: parseFloat(price),
+          categoryId,
+          colorId,
+          sizeId,
+          isFeatured,
+          isArchived,
+        })
+        .where(eq(products.id, productId));
 
-    const product = await prismadb.product.update({
-      where: {
-        id: params.productId,
-      },
-      data: {
-        images: {
-          createMany: {
-            data: [...images.map((image: { url: string }) => image)],
-          },
+      await tx.delete(images).where(eq(images.productId, productId));
+
+      await tx.insert(images).values(
+        productImages.map((image: { url: string }) => ({
+          id: crypto.randomUUID(),
+          productId: productId,
+          url: image.url,
+        }))
+      );
+
+      return await tx.query.products.findFirst({
+        where: eq(products.id, productId),
+        with: {
+          images: true,
         },
-      },
+      });
     });
 
     return NextResponse.json(product);

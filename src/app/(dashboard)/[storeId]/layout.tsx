@@ -1,27 +1,28 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 
 import Navbar from '@/components/navbar';
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { stores } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 export default async function DashboardLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: { storeId: string };
+  params: Promise<{ storeId: string }>;
 }) {
-  const { userId } = auth();
+  const { userId } = await auth();
 
   if (!userId) {
     redirect('/sign-in');
   }
 
-  const store = await prismadb.store.findFirst({
-    where: {
-      id: params.storeId,
-      userId,
-    },
+  const { storeId } = await params;
+
+  const store = await db.query.stores.findFirst({
+    where: and(eq(stores.id, storeId), eq(stores.userId, userId)),
   });
 
   if (!store) {

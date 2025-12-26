@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Trash } from 'lucide-react';
-import { Category, Color, Image, Product, Size } from '@prisma/client';
+import { Category, Color, Image, Product, Size } from '@/db/schema';
 import { useParams, useRouter } from 'next/navigation';
 
 import { Input } from '@/components/ui/input';
@@ -37,12 +37,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 const formSchema = z.object({
   name: z.string().min(1),
   images: z.object({ url: z.string() }).array(),
-  price: z.coerce.number().min(1),
+  price: z.number().min(1),
   categoryId: z.string().min(1),
   colorId: z.string().min(1),
   sizeId: z.string().min(1),
-  isFeatured: z.boolean().default(false).optional(),
-  isArchived: z.boolean().default(false).optional(),
+  isFeatured: z.boolean(),
+  isArchived: z.boolean(),
 });
 
 type ProductFormValues = z.infer<typeof formSchema>;
@@ -77,8 +77,14 @@ export default function ProductForm({
 
   const defaultValues = initialData
     ? {
-        ...initialData,
-        price: parseFloat(String(initialData?.price)),
+        name: initialData.name,
+        images: initialData.images.map((image) => ({ url: image.url })),
+        price: parseFloat(String(initialData.price)),
+        categoryId: initialData.categoryId,
+        colorId: initialData.colorId,
+        sizeId: initialData.sizeId,
+        isFeatured: initialData.isFeatured,
+        isArchived: initialData.isArchived,
       }
     : {
         name: '',
@@ -213,6 +219,9 @@ export default function ProductForm({
                       disabled={loading}
                       placeholder="9.99"
                       {...field}
+                      onChange={(e) =>
+                        field.onChange(parseFloat(e.target.value))
+                      }
                     />
                   </FormControl>
                   <FormMessage />

@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Trash } from 'lucide-react';
-import { Store } from '@prisma/client';
+import { Store } from '@/db/schema';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -46,7 +46,9 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData,
+    defaultValues: {
+      name: initialData.name,
+    },
   });
 
   const onSubmit = async (data: SettingsFormValues) => {

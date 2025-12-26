@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Trash } from 'lucide-react';
-import { Size } from '@prisma/client';
+import { Size } from '@/db/schema';
 import { useParams, useRouter } from 'next/navigation';
 
 import { Input } from '@/components/ui/input';
@@ -49,9 +49,15 @@ export default function SizeForm({ initialData }: SizeFormProps) {
 
   const form = useForm<SizeFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
-      name: '',
-    },
+    defaultValues: initialData
+      ? {
+          name: initialData.name,
+          value: initialData.value,
+        }
+      : {
+          name: '',
+          value: '',
+        },
   });
 
   const onSubmit = async (data: SizeFormValues) => {

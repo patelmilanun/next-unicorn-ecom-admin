@@ -1,12 +1,12 @@
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { products } from '@/db/schema';
+import { eq, and, count } from 'drizzle-orm';
 
 export const getStockCount = async (storeId: string) => {
-  const stockCount = await prismadb.product.count({
-    where: {
-      storeId,
-      isArchived: false,
-    },
-  });
+  const result = await db
+    .select({ value: count() })
+    .from(products)
+    .where(and(eq(products.storeId, storeId), eq(products.isArchived, false)));
 
-  return stockCount;
+  return result[0].value;
 };

@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
+import { desc, eq } from 'drizzle-orm';
 
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { orders } from '@/db/schema';
 import { formatter } from '@/lib/utils';
 
 import { OrderColumn } from './components/columns';
@@ -9,25 +11,22 @@ import OrderClient from './components/client';
 export default async function OrdersPage({
   params,
 }: {
-  params: { storeId: string };
+  params: Promise<{ storeId: string }>;
 }) {
-  const orders = await prismadb.order.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-    include: {
+  const { storeId } = await params;
+  const results = await db.query.orders.findMany({
+    where: eq(orders.storeId, storeId),
+    with: {
       orderItems: {
-        include: {
+        with: {
           product: true,
         },
       },
     },
-    orderBy: {
-      createdAt: 'desc',
-    },
+    orderBy: desc(orders.createdAt),
   });
 
-  const formattedOrders: OrderColumn[] = orders.map((item) => ({
+  const formattedOrders: OrderColumn[] = results.map((item) => ({
     id: item.id,
     phone: item.phone,
     address: item.address,
@@ -40,7 +39,7 @@ export default async function OrdersPage({
       }, 0)
     ),
     isPaid: item.isPaid,
-    createdAt: format(item.createdAt, 'MMMM do, yyyy'),
+    createdAt: format(item.createdAt!, 'MMMM do, yyyy'),
   }));
 
   return (

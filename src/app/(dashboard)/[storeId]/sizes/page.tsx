@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
+import { desc, eq } from 'drizzle-orm';
 
-import prismadb from '@/lib/prismadb';
+import { db } from '@/lib/db';
+import { sizes } from '@/db/schema';
 
 import { SizeColumn } from './components/columns';
 import SizesClient from './components/client';
@@ -8,22 +10,19 @@ import SizesClient from './components/client';
 export default async function SizesPage({
   params,
 }: {
-  params: { storeId: string };
+  params: Promise<{ storeId: string }>;
 }) {
-  const sizes = await prismadb.size.findMany({
-    where: {
-      storeId: params.storeId,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
+  const { storeId } = await params;
+  const results = await db.query.sizes.findMany({
+    where: eq(sizes.storeId, storeId),
+    orderBy: desc(sizes.createdAt),
   });
 
-  const formattedSizes: SizeColumn[] = sizes.map((item) => ({
+  const formattedSizes: SizeColumn[] = results.map((item) => ({
     id: item.id,
     name: item.name,
     value: item.value,
-    createdAt: format(item.createdAt, 'MMMM do, yyyy'),
+    createdAt: format(item.createdAt!, 'MMMM do, yyyy'),
   }));
 
   return (

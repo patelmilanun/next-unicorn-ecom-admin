@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Trash } from 'lucide-react';
-import { Color } from '@prisma/client';
+import { Color } from '@/db/schema';
 import { useParams, useRouter } from 'next/navigation';
 
 import { Input } from '@/components/ui/input';
@@ -51,9 +51,15 @@ export default function ColorForm({ initialData }: ColorFormProps) {
 
   const form = useForm<ColorFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
-      name: '',
-    },
+    defaultValues: initialData
+      ? {
+          name: initialData.name,
+          value: initialData.value,
+        }
+      : {
+          name: '',
+          value: '',
+        },
   });
 
   const onSubmit = async (data: ColorFormValues) => {

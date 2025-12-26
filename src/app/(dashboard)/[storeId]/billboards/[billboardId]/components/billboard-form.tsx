@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Trash } from 'lucide-react';
-import { Billboard } from '@prisma/client';
+import { Billboard } from '@/db/schema';
 import { useParams, useRouter } from 'next/navigation';
 
 import { Input } from '@/components/ui/input';
@@ -52,10 +52,15 @@ export default function BillboardForm({ initialData }: BillboardFormProps) {
 
   const form = useForm<BillboardFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
-      label: '',
-      imageUrl: '',
-    },
+    defaultValues: initialData
+      ? {
+          label: initialData.label,
+          imageUrl: initialData.imageUrl,
+        }
+      : {
+          label: '',
+          imageUrl: '',
+        },
   });
 
   const onSubmit = async (data: BillboardFormValues) => {
