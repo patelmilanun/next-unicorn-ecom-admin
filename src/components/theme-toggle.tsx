@@ -13,7 +13,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export default function ThemeToggle() {
+  const [isMounted, setIsMounted] = React.useState(false);
   const { setTheme } = useTheme();
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <DropdownMenu>

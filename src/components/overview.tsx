@@ -6,7 +6,7 @@ interface OverviewProps {
   data: any[];
 }
 
-export default async function Overview(props: OverviewProps) {
+export default function Overview(props: OverviewProps) {
   const data = props?.data;
   return (
     <ResponsiveContainer width="100%" height={350}>
