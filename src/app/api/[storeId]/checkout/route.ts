@@ -13,24 +13,29 @@ const corsHeaders = {
 };
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+  return new NextResponse(null, { headers: corsHeaders });
 }
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ storeId: string }> }
 ) {
-  const { productIds, redirectUrl, cancelUrl } = await req.json();
+  try {
+    const { productIds, redirectUrl, cancelUrl } = await req.json();
 
-  if (!productIds || productIds.length === 0) {
-    return new NextResponse('Product ids are required', { status: 400 });
-  }
+    if (!productIds || productIds.length === 0) {
+      return NextResponse.json(
+        { error: 'Product ids are required' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
 
-  if (!redirectUrl || !cancelUrl) {
-    return new NextResponse('Redirect Url and Cancel Url are required', {
-      status: 400,
-    });
-  }
+    if (!redirectUrl || !cancelUrl) {
+      return NextResponse.json(
+        { error: 'Redirect Url and Cancel Url are required' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
 
   const { storeId } = await params;
 
@@ -45,7 +50,7 @@ export async function POST(
     line_items.push({
       quantity: 1,
       price_data: {
-        currency: 'USD',
+        currency: 'INR',
         product_data: {
           name: product.name,
         },
@@ -96,4 +101,11 @@ export async function POST(
       headers: corsHeaders,
     }
   );
+  } catch (error) {
+    console.log('[CHECKOUT_POST]', error);
+    return NextResponse.json(
+      { error: 'Internal error' },
+      { status: 500, headers: corsHeaders }
+    );
+  }
 }
