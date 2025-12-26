@@ -37,70 +37,70 @@ export async function POST(
       );
     }
 
-  const { storeId } = await params;
+    const { storeId } = await params;
 
-  const products = await db
-    .select()
-    .from(productsTable)
-    .where(inArray(productsTable.id, productIds));
+    const products = await db
+      .select()
+      .from(productsTable)
+      .where(inArray(productsTable.id, productIds));
 
-  const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
 
-  products.forEach((product) => {
-    line_items.push({
-      quantity: 1,
-      price_data: {
-        currency: 'INR',
-        product_data: {
-          name: product.name,
+    products.forEach((product) => {
+      line_items.push({
+        quantity: 1,
+        price_data: {
+          currency: 'INR',
+          product_data: {
+            name: product.name,
+          },
+          unit_amount: (product.price || 0) * 100,
         },
-        unit_amount: (product.price || 0) * 100,
+      });
+    });
+
+    const order = await db.transaction(async (tx) => {
+      const orderId = crypto.randomUUID();
+      const [newOrder] = await tx
+        .insert(orders)
+        .values({
+          id: orderId,
+          storeId: storeId,
+          isPaid: false,
+        })
+        .returning();
+
+      await tx.insert(orderItems).values(
+        productIds.map((productId: string) => ({
+          id: crypto.randomUUID(),
+          orderId,
+          productId,
+        }))
+      );
+
+      return newOrder;
+    });
+
+    const session = await stripe.checkout.sessions.create({
+      line_items,
+      mode: 'payment',
+      billing_address_collection: 'required',
+      phone_number_collection: {
+        enabled: true,
+      },
+      success_url: redirectUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        orderId: order.id,
       },
     });
-  });
 
-  const order = await db.transaction(async (tx) => {
-    const orderId = crypto.randomUUID();
-    const [newOrder] = await tx
-      .insert(orders)
-      .values({
-        id: orderId,
-        storeId: storeId,
-        isPaid: false,
-      })
-      .returning();
-
-    await tx.insert(orderItems).values(
-      productIds.map((productId: string) => ({
-        id: crypto.randomUUID(),
-        orderId,
-        productId,
-      }))
+    return NextResponse.json(
+      { url: session.url },
+      {
+        headers: corsHeaders,
+      }
     );
-
-    return newOrder;
-  });
-
-  const session = await stripe.checkout.sessions.create({
-    line_items,
-    mode: 'payment',
-    billing_address_collection: 'required',
-    phone_number_collection: {
-      enabled: true,
-    },
-    success_url: redirectUrl,
-    cancel_url: cancelUrl,
-    metadata: {
-      orderId: order.id,
-    },
-  });
-
-  return NextResponse.json(
-    { url: session.url },
-    {
-      headers: corsHeaders,
-    }
-  );
   } catch (error) {
     console.log('[CHECKOUT_POST]', error);
     return NextResponse.json(
